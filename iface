@@ -1,0 +1,42 @@
+from Detector import Analyzer
+from telnetlib import Telnet
+import subprocess
+
+t = Telnet ('169.254.2.116')
+t.read_until('login: ')
+t.write ('as\n')
+t.read_until('>')
+t.write ('abort\n')
+t.read_until('>')
+t.write ('kill\n')
+t.read_until(') ')
+t.write ('1\n')
+t.read_until('>')
+t.write ('pckill\n')
+t.read_until(') ')
+t.write ('1\n')
+t.read_until('>')
+t.write ('zpower on\n')
+t.read_until('>')
+t.write('signal -2011\n')
+t.read_until('>')
+t.write('signal -2012\n')
+t.read_until('>')
+t.write('signal -2013\n')
+t.read_until('>')
+t.write ('exe main\n')
+t.read_until('>')
+print "hose"
+
+while True:
+    txt = raw_input ("Write sth: ")
+    a = Analyzer (str (txt))
+    val = a.getProb ()
+
+    print val
+    if val >= 68:
+        print "Pierdola"
+    else:
+        print "OK"
+        t.write ('pcexe gle.pc\n')
+        t.read_until('>')
