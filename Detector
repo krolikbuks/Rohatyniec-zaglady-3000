@@ -1,0 +1,104 @@
+import json
+import nltk
+import re
+from math import sqrt
+from urllib2 import Request, urlopen, quote
+
+class Analyzer:
+    def __init__ (self, sentence):
+        self.words = []
+        self.categories = {}
+        self.numCategories = 0
+        self.vis = {}
+        self.weight = 0
+        data = nltk.word_tokenize (sentence)
+        data = nltk.pos_tag (data)
+        for i in data:
+            if i [1] [0] != 'N' and i[1][0] != 'J' and i[1][0] != 'V':
+                continue
+            self.words.append (i)
+
+    def wikipediaDfs (self, phrase, depth):
+        self.vis [phrase] = True
+        url = "https://en.wikipedia.org/w/api.php?action=query&titles=%s&prop=categories&clshow=!hidden&redirects&format=json" % quote (phrase)
+        req = Request (url)
+        data = urlopen (req)
+        ret = json.loads (data.read ())
+        if not 'query' in ret:
+            return []
+        if 'redirects' in ret ['query']:
+            phrase = ret ['query'] ['redirects'] [0] ['to']
+        sol = [(phrase, depth)]
+        if not 'categories' in ret ['query'] ['pages'] [ret ['query'] ['pages'].keys () [0]]:
+            return sol
+        print "%s %d" % (phrase, depth)
+        for i in ret ['query'] ['pages'] [ret ['query'] ['pages'].keys () [0]] ['categories']:
+            act = i ["title"]
+            if act == "Category:Disambiguation pages":
+                continue
+            if depth + 1 <= 4 and not act in self.vis:
+                sol = sol + self.wikipediaDfs (act, depth + 1)
+           # act = nltk.word_tokenize (act)
+           # if depth + 1 <= 4:
+           #     for i in range (1, len (act)):
+           #         sol = sol + self.wikipediaDfs (act [i], depth + 1)
+        return sol
+
+    def odl (self):
+        tmp = []
+        ret = []
+        for i in range (len (self.words)):
+            tmp.append (self.wikipediaDfs (self.words [i] [0], 0))
+            tmp [len (tmp) - 1].append (i)
+            print "back"
+            self.vis.clear ()
+            swp = (tmp [len (tmp) - 1] [0] [0], self.words [i] [1])
+            self.words [i] = swp
+        for i in range (1, len (self.words)):
+            buf = self.words [i - 1] [0] + ' ' + self.words [i] [0]
+            print buf
+            tmp.append (self.wikipediaDfs (buf, 0))
+        for i in tmp:
+            for j in tmp:
+                if i [len (i) - 1] == j [len (j) - 1]:
+                    continue
+                w1 = i [0] [0]
+                w2 = j [0] [0]
+                flag = False
+                for k in i [:len (i) - 1]:
+                    for l in j [:len (j) - 1]:
+                        c = 0
+                        if k [0] == l [0]:
+                            ret.append (k [1] + l [1])
+                            flag = True
+                            c += 1
+                            if c > self.weight:
+                                self.weight = c
+                            if not w1 in self.categories and not w2 in self.categories:
+                                self.numCategories += 1
+                            self.categories [w1] = True
+                            self.categories [w2] = True
+                if flag == False:
+                    if not w1 in self.categories:
+                        self.categories [w1] = True
+                        self.numCategories += 1
+                    if not w2 in self.categories:
+                        self.categories [w2] = True
+                        self.numCategories += 1
+        if len (ret) == 0:
+            ret.append (18)
+        return ret
+
+    def getPowAvg (self, V, p = 2):
+        res = 0
+        for i in V:
+            res += pow (i, p)
+        res /= len (V)
+        pow (res, 1/p)
+        return res
+
+    def getProb (self):
+        dists = self.odl ()
+        mx = max (dists)
+        print self.numCategories
+        return sqrt ((self.numCategories * mx) / (len (self.words) + self.weight ))  + (self.getPowAvg (dists, 2) + 1)
